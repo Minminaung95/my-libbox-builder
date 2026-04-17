@@ -4,58 +4,38 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-libbox:
-    name: Build libbox.aar
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout sing-box
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
         with:
-          repository: SagerNet/sing-box
-          ref: 'v1.13.8'
-          fetch-depth: 0
+          distribution: "temurin"
+          java-version: "17"
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22' # ChatGPT ရေးပေးခဲ့တဲ့ အမှန်ကန်ဆုံး Version ပါ
-          cache: true
-
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1
-        id: setup-ndk
-        with:
-          ndk-version: r25c
-          add-to-path: true
+          go-version: "1.22"
 
       - name: Install gomobile
         run: |
-          go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
-          go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.12
-          export PATH=$PATH:$(go env GOPATH)/bin
+          go install golang.org/x/mobile/cmd/gomobile@latest
           gomobile init
 
-      - name: Install dependencies
-        run: |
-          go mod download
+      - name: Clone repo
+        run: git clone https://github.com/SagerNet/sing-box.git
 
-      - name: Build libbox.aar
-        env:
-          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+      - name: Build AAR
         run: |
-          export PATH=$PATH:$(go env GOPATH)/bin
-          # Android Project ထဲထည့်ဖို့ aar ဖိုင် အစစ်ကို ထုတ်ပေးမယ့် စာကြောင်းပါ
-          gomobile bind -v -target=android -androidapi 21 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
+          cd sing-box
+          make libbox
 
-      - name: Upload artifact
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: libbox-aar
-          path: libbox.aar # ဖိုင်ကို အပြင်ဘက်ထုတ်ပေးပါမယ်
+          path: sing-box/build/libs/*.aar
