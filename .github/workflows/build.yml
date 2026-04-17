@@ -1,47 +1,38 @@
-name: Build libbox AAR
+name: "Build and push images"
 
-on: 
+on:
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.21.13'
+  Build:
+      runs-on: ubuntu-latest
+      name: "Build Sing-box image"
+      env:
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        DOCKERHUB_REPOSITORY: ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.2
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          fetch-depth: 0
 
-      - name: Download and Build Engine
-        run: |
-          # Git ကို မသုံးတော့ဘဲ v1.18.8 Source ကို တိုက်ရိုက်ဆွဲမယ်
-          curl -L https://github.com/SagerNet/sing-box/archive/refs/tags/v1.18.8.tar.gz -o source.tar.gz
-          tar -xzf source.tar.gz
-          
-          # Folder နာမည်ကို sing-box လို့ နာမည်ပြောင်းလိုက်မယ်
-          mv sing-box-1.18.8 sing-box
-          cd sing-box
-          
-          # gomobile သွင်းမယ်
-          go install golang.org/x/mobile/cmd/gomobile@latest
-          go install golang.org/x/mobile/cmd/gobind@latest
-          export PATH=$PATH:$(go env GOPATH)/bin
-          gomobile init
-          
-          # Build လုပ်မယ်
-          gomobile bind -v -target=android -androidapi 21 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
-          
-          # ဖိုင်ကို အပြင်ဘက် ပြန်ထုတ်မယ်
-          cp libbox.aar ../
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4.0.0
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.0.0
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v4.0.0
         with:
-          name: libbox-aar
-          path: libbox.aar
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+
+      - name: Push images to Docker hub
+        uses: docker/build-push-action@v7.0.0
+        with:
+          push: true
+          platforms: linux/amd64, linux/arm64, linux/arm/v7
+          tags: ${{ env.DOCKERHUB_REPOSITORY }}
