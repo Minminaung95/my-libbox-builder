@@ -1,12 +1,7 @@
 name: Build libbox AAR
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'sing-box branch or tag (e.g. v1.18.8)'
-        required: false
-        default: 'v1.18.8' # တည်ငြိမ်တဲ့ Version ကို Default ထားပေးထားပါတယ်
+  workflow_dispatch: # ဘာမှရိုက်စရာမလိုဘဲ ခလုတ်နှိပ်ရုံနဲ့ Build ပါမယ်
 
 jobs:
   build-libbox:
@@ -18,13 +13,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: SagerNet/sing-box
-          ref: ${{ github.event.inputs.version }}
+          ref: 'v1.18.8' # အလုပ်လုပ်တာ သေချာတဲ့ version ကို တိုက်ရိုက် သတ်မှတ်လိုက်ပါပြီ
           fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21.13' # ပိုပြီး တည်ငြိမ်တဲ့ Go ကို သုံးပါမယ်
+          go-version: '1.21.13'
           cache: true
 
       - name: Setup Java 17
@@ -37,7 +32,7 @@ jobs:
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
-          ndk-version: r25c # Linker Error မရှိတဲ့ ဗားရှင်းကို ပြောင်းထားပါတယ်
+          ndk-version: r25c
           add-to-path: true
 
       - name: Install gomobile
@@ -51,8 +46,8 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
-          # အခုနက Error တက်စေတဲ့ cronet ကို tags ထဲမှာ ဖယ်ထုတ်ပြီး Build ပါမယ်
-          # ဒါဟာ VPN App အတွက် ဘာမှ မထိခိုက်ပါဘူး
+          export PATH=$PATH:$(go env GOPATH)/bin
+          # Linker Error မတက်အောင် ရှင်းလင်းတဲ့ build စာကြောင်းကို သုံးပါမယ်
           gomobile bind -v -target=android -androidapi 21 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
 
       - name: Upload artifact
