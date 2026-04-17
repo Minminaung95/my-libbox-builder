@@ -1,0 +1,37 @@
+name: Build libbox AAR
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sing-box
+        uses: actions/checkout@v4
+        with:
+          repository: SagerNet/sing-box
+          ref: main
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Build Engine
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          gomobile init
+          gomobile bind -v -target=android -androidapi 21 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api -o libbox.aar ./experimental/libbox
+
+      - name: Upload AAR File
+        uses: actions/upload-artifact@v4
+        with:
+          name: libbox-aar
+          path: libbox.aar
