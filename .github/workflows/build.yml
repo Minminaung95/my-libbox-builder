@@ -13,13 +13,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: SagerNet/sing-box
-          ref: 'v1.13.8' # <--- တကယ် အလုပ်လုပ်တဲ့ Version အစစ်ပါ
+          ref: 'v1.13.8'
           fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21.13'
+          go-version: '1.22' # ChatGPT ရေးပေးခဲ့တဲ့ အမှန်ကန်ဆုံး Version ပါ
           cache: true
 
       - name: Setup Java 17
@@ -42,15 +42,20 @@ jobs:
           export PATH=$PATH:$(go env GOPATH)/bin
           gomobile init
 
+      - name: Install dependencies
+        run: |
+          go mod download
+
       - name: Build libbox.aar
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
+          # Android Project ထဲထည့်ဖို့ aar ဖိုင် အစစ်ကို ထုတ်ပေးမယ့် စာကြောင်းပါ
           gomobile bind -v -target=android -androidapi 21 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: libbox-aar
-          path: libbox.aar # <--- ဖိုင်ကို အပြင်ထုတ်ပေးမယ့် အဆင့်ပါ
+          path: libbox.aar # ဖိုင်ကို အပြင်ဘက်ထုတ်ပေးပါမယ်
