@@ -1,50 +1,101 @@
+# .github/workflows/build.yml
 name: Build libbox AAR
 
-on: 
+on:
+  push:
+    branches: [ main, dev-next ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'sing-box version tag (e.g. v1.12.0), empty = latest'
+        required: false
+        default: ''
 
 jobs:
-  build:
+  build-libbox:
+    name: Build libbox.aar
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout Source
+      # ─── 1. Checkout sing-box source ───────────────────────────────────────
+      - name: Checkout sing-box
         uses: actions/checkout@v4
         with:
           repository: SagerNet/sing-box
-          fetch-depth: 1
+          ref: ${{ github.event.inputs.version || 'dev-next' }}
+          fetch-depth: 0
 
+      # ─── 2. Setup Go (version from go.mod) ─────────────────────────────────
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
-          cache: false # Cache ကြောင့် Error မတက်အောင် ပိတ်ထားပါမယ်
+          go-version-file: 'go.mod'
+          cache: true
 
-      - name: Setup Java
+      # ─── 3. Setup Java (gomobile needs JDK) ────────────────────────────────
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Build Engine
-        run: |
-          # 1. gomobile နဲ့ လိုအပ်တဲ့ tools တွေ သွင်းမယ်
-          go install golang.org/x/mobile/cmd/gomobile@latest
-          go install golang.org/x/mobile/cmd/gobind@latest
-          
-          # 2. Path တွေကို သတ်မှတ်မယ်
-          export PATH=$PATH:$(go env GOPATH)/bin
-          
-          # 3. gomobile ကို init လုပ်မယ်
-          gomobile init
-          
-          # 4. လိုအပ်တဲ့ mobile bind package ကို တိုက်ရိုက်ယူမယ်
-          go get golang.org/x/mobile/bind
-          
-          # 5. Build စလုပ်မယ် (Tags တွေကို အစ်ကို့အတွက် အစုံထည့်ပေးထားပါတယ်)
-          gomobile bind -v -target=android -androidapi 21 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
+      # ─── 4. Setup Android NDK ───────────────────────────────────────────────
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r26d
+          add-to-path: true
 
-      - name: Upload Artifact
+      # ─── 5. Install gomobile (sagernet fork) ────────────────────────────────
+      - name: Install gomobile
+        run: |
+          go install github.com/sagernet/gomobile/cmd/gomobile@latest
+          go install github.com/sagernet/gomobile/cmd/gobind@latest
+          gomobile init
+
+      # ─── 6. Install build dependencies ─────────────────────────────────────
+      - name: Install dependencies
+        run: |
+          go get github.com/sagernet/gomobile@latest
+          go mod download
+
+      # ─── 7. Build libbox.aar ────────────────────────────────────────────────
+      - name: Build libbox.aar
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          mkdir -p output
+          go run ./cmd/internal/build_libbox \
+            -target android \
+            -outdir ./output
+
+      # ─── 8. Rename with version tag ─────────────────────────────────────────
+      - name: Rename output
+        run: |
+          VERSION=$(git describe --tags --always)
+          mv output/libbox.aar output/libbox-${VERSION}.aar
+          echo "AAR_FILE=output/libbox-${VERSION}.aar" >> $GITHUB_ENV
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      # ─── 9. Upload artifact ─────────────────────────────────────────────────
+      - name: Upload libbox.aar
         uses: actions/upload-artifact@v4
         with:
-          name: libbox-aar
-          path: libbox.aar
+          name: libbox-${{ env.VERSION }}
+          path: ${{ env.AAR_FILE }}
+          retention-days: 30
+
+      # ─── 10. Create GitHub Release (tag push မှသာ) ──────────────────────────
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.AAR_FILE }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
