@@ -13,7 +13,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: SagerNet/sing-box
-          ref: 'v1.18.8' # တည်ငြိမ်တဲ့ Version ကို သုံးပါမယ်
+          ref: 'v1.13.8' # <--- တကယ် အလုပ်လုပ်တဲ့ Version အစစ်ပါ
           fetch-depth: 0
 
       - name: Setup Go
@@ -47,11 +47,10 @@ jobs:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
-          # Android အတွက် အမှန်ကန်ဆုံးထုတ်မယ့်စာကြောင်း (cronet error ဖယ်ထားပါတယ်)
           gomobile bind -v -target=android -androidapi 21 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: libbox-aar
-          path: libbox.aar
+          path: libbox.aar # <--- ဖိုင်ကို အပြင်ထုတ်ပေးမယ့် အဆင့်ပါ
