@@ -1,87 +1,45 @@
 name: Build libbox AAR
 
-on:
-  push:
-    branches: [ main, testing ]
-    tags:
-      - 'v*'
-  pull_request:
-    branches: [ main ]
+on: 
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'sing-box branch or tag (e.g. v1.13.1), empty = testing branch'
-        required: false
-        default: ''
 
 jobs:
-  build-libbox:
-    name: Build libbox.aar
+  build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout sing-box
-        uses: actions/checkout@v4
-        with:
-          repository: SagerNet/sing-box
-          ref: ${{ github.event.inputs.version || 'testing' }}
-          fetch-depth: 0
-
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'
-          cache: true
+          go-version: '1.21.13'
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1
-        id: setup-ndk
-        with:
-          ndk-version: r26d
-          add-to-path: true
-
-      - name: Install gomobile
+      - name: Download and Build Engine
         run: |
-          go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
-          go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.12
+          # Git ကို မသုံးတော့ဘဲ v1.18.8 source code ကို တိုက်ရိုက် Zip နဲ့ ဒေါင်းမယ်
+          curl -L https://github.com/SagerNet/sing-box/archive/refs/tags/v1.18.8.zip -o source.zip
+          unzip source.zip
+          cd sing-box-1.18.8
+          
+          # gomobile သွင်းမယ်
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          export PATH=$PATH:$(go env GOPATH)/bin
           gomobile init
+          go get golang.org/x/mobile/bind
+          
+          # အင်ဂျင်ကို ထုတ်မယ်
+          gomobile bind -v -target=android -androidapi 21 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
+          
+          # ဖိုင်ကို အပြင်ဘက် ပြန်ထုတ်မယ်
+          cp libbox.aar ../
 
-      - name: Install dependencies
-        run: |
-          go mod download
-
-      - name: Build libbox.aar
-        env:
-          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-        run: |
-          go run ./cmd/internal/build_libbox -target android
-
-      - name: Move and rename output
-        run: |
-          mkdir -p output
-          VERSION=$(git describe --tags --always)
-          mv libbox.aar output/libbox-${VERSION}.aar
-          echo "AAR_FILE=output/libbox-${VERSION}.aar" >> $GITHUB_ENV
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
-
-      - name: Upload artifact
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: libbox-${{ env.VERSION }}
-          path: ${{ env.AAR_FILE }}
-          retention-days: 30
-
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ env.AAR_FILE }}
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: libbox-aar
+          path: libbox.aar
