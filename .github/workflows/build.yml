@@ -5,7 +5,6 @@ on:
 
 jobs:
   build-libbox:
-    name: Build libbox.aar
     runs-on: ubuntu-latest
 
     steps:
@@ -13,14 +12,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: SagerNet/sing-box
-          ref: 'v1.13.8'
-          fetch-depth: 0
+          ref: 'v1.18.8' # Hysteria2 အပြည့်အဝပါတဲ့ တည်ငြိမ်တဲ့ Version ပါ
+          fetch-depth: 1
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22' # ChatGPT ရေးပေးခဲ့တဲ့ အမှန်ကန်ဆုံး Version ပါ
-          cache: true
+          go-version: '1.21.13' # <--- ဒီကောင်က os.checkPidfdOnce Error ကို လုံးဝ ရှင်းပေးမယ့် Version ပါ
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -30,32 +28,25 @@ jobs:
 
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
-        id: setup-ndk
         with:
           ndk-version: r25c
-          add-to-path: true
 
       - name: Install gomobile
         run: |
-          go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
-          go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.12
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
           export PATH=$PATH:$(go env GOPATH)/bin
           gomobile init
-
-      - name: Install dependencies
-        run: |
-          go mod download
+          go get golang.org/x/mobile/bind
 
       - name: Build libbox.aar
-        env:
-          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
-          # Android Project ထဲထည့်ဖို့ aar ဖိုင် အစစ်ကို ထုတ်ပေးမယ့် စာကြောင်းပါ
+          # Android အတွက် cronet error လည်းကင်းအောင် Tags တွေကို သေချာ စီပေးထားပါတယ်
           gomobile bind -v -target=android -androidapi 21 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: libbox-aar
-          path: libbox.aar # ဖိုင်ကို အပြင်ဘက်ထုတ်ပေးပါမယ်
+          path: libbox.aar # <--- ဖိုင်ကို အပြင်ထုတ်ပေးမယ့် အဆင့်ပါ
