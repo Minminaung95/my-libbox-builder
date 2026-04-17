@@ -7,10 +7,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+        with:
+          repository: SagerNet/sing-box
+          fetch-depth: 1
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: 'stable'
+          go-version: '1.23' # အသစ်ဆုံး Go ကို သုံးပါမယ်
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -18,26 +24,19 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android NDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install NDK
-        run: sdkmanager "ndk;25.2.9519653"
-
-      - name: Clone and Build Engine
+      - name: Build Engine
         run: |
-          git clone --depth 1 https://github.com/SagerNet/sing-box.git
-          cd sing-box
-          export PATH=$PATH:$(go env GOPATH)/bin
-          export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653
+          # gomobile ကို သွင်းပြီး path သတ်မှတ်မယ်
           go install golang.org/x/mobile/cmd/gomobile@latest
+          export PATH=$PATH:$(go env GOPATH)/bin
           gomobile init
-          go run ./cmd/internal/build_libbox -target android
-        env:
-          ANDROID_NDK_HOME: ${{ steps.setup-android.outputs.sdk-path }}/ndk/25.2.9519653
+          
+          # androidapi 21 ကနေ 26 ကို တိုးလိုက်ပါတယ် (Hysteria2 အတွက် ပိုတည်ငြိမ်အောင်)
+          # with_gvisor ကို ပြန်ထည့်ပေးထားပါတယ်
+          gomobile bind -v -target=android -androidapi 26 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
 
-      - name: Upload AAR File
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: libbox-aar
-          path: sing-box/*.aar
+          path: libbox.aar
