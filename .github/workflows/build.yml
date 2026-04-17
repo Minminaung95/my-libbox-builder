@@ -1,68 +1,38 @@
-name: Build libbox AAR
+name: Build libbox
 
 on:
-  workflow_dispatch: # ခလုတ်နှိပ်တာနဲ့ အလိုလို Run ပါမယ်။ Version ရိုက်ထည့်စရာ မလိုတော့ပါဘူး။
+  push:
+    branches: [ "main" ]
+  pull_request:
 
 jobs:
-  build-libbox:
-    name: Build libbox.aar
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout sing-box
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          repository: SagerNet/sing-box
-          ref: 'v1.13.8' # တကယ်ရှိတဲ့ နောက်ဆုံး Stable Version အစစ်ကို တိုက်ရိုက် ခေါ်ထားပါတယ်။
-          fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'
-          cache: true
-
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1
-        id: setup-ndk
-        with:
-          ndk-version: r25c # Linker Error မရှိတဲ့ Version
-          add-to-path: true
-
-      - name: Install gomobile
-        run: |
-          go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
-          go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.12
-          export PATH=$PATH:$(go env GOPATH)/bin
-          gomobile init
+          go-version: "1.22"
 
       - name: Install dependencies
         run: |
-          go mod download
+          sudo apt-get update
+          sudo apt-get install -y build-essential
 
-      - name: Build libbox.aar
-        env:
-          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+      - name: Clone source
         run: |
-          export PATH=$PATH:$(go env GOPATH)/bin
-          # Error တက်စေတဲ့ cronet ကို ဖယ်ထုတ်ပြီး Hysteria2, Reality အကုန်ပါတဲ့ Tags တွေနဲ့ Build ပါမယ်
-          gomobile bind -v -target=android -androidapi 21 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
+          git clone https://github.com/SagerNet/sing-box.git
 
-      - name: Move and rename output
+      - name: Build libbox
         run: |
-          mkdir -p output
-          mv libbox.aar output/libbox-v1.13.8.aar
-          echo "AAR_FILE=output/libbox-v1.13.8.aar" >> $GITHUB_ENV
+          cd sing-box
+          go mod tidy
+          go build -o libbox ./cmd/sing-box
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: libbox-v1.13.8
-          path: ${{ env.AAR_FILE }}
-          retention-days: 30
+      - name: Check build output
+        run: |
+          ls -lah sing-box
