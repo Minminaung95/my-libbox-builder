@@ -10,9 +10,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'sing-box branch or tag (e.g. v1.13.1), empty = testing branch'
+        description: 'sing-box branch or tag (e.g. v1.18.8), empty = testing branch'
         required: false
-        default: ''
+        default: 'v1.18.8'
 
 jobs:
   build-libbox:
@@ -30,7 +30,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'
+          go-version: '1.21.13'
           cache: true
 
       - name: Setup Java 17
@@ -43,13 +43,14 @@ jobs:
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
-          ndk-version: r26d
+          ndk-version: r25c # Linker Error ကင်းဝေးအောင် r25c ကို သုံးထားပါတယ်
           add-to-path: true
 
       - name: Install gomobile
         run: |
           go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
           go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.12
+          export PATH=$PATH:$(go env GOPATH)/bin
           gomobile init
 
       - name: Install dependencies
@@ -60,12 +61,16 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
-          go run ./cmd/internal/build_libbox -target android
+          export PATH=$PATH:$(go env GOPATH)/bin
+          # Error တက်စေတဲ့ cronet ကို ဖယ်ထုတ်ပြီး အစ်ကို့အတွက် အသေချာဆုံး tags တွေနဲ့ build ပါမယ်
+          gomobile bind -v -target=android -androidapi 21 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
 
       - name: Move and rename output
         run: |
           mkdir -p output
-          VERSION=$(git describe --tags --always)
+          # Version နာမည်ယူတဲ့အပိုင်းမှာ အမှားမရှိအောင် သေချာပြင်ထားပါတယ်
+          VERSION=${{ github.event.inputs.version }}
+          if [ -z "$VERSION" ]; then VERSION="testing"; fi
           mv libbox.aar output/libbox-${VERSION}.aar
           echo "AAR_FILE=output/libbox-${VERSION}.aar" >> $GITHUB_ENV
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
@@ -76,12 +81,3 @@ jobs:
           name: libbox-${{ env.VERSION }}
           path: ${{ env.AAR_FILE }}
           retention-days: 30
-
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ env.AAR_FILE }}
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
