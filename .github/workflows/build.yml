@@ -1,12 +1,7 @@
 name: Build libbox AAR
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'sing-box branch or tag (e.g. v1.18.8)'
-        required: false
-        default: 'v1.18.8'
+  workflow_dispatch: # ခလုတ်နှိပ်တာနဲ့ အလိုလို Run ပါမယ်။ Version ရိုက်ထည့်စရာ မလိုတော့ပါဘူး။
 
 jobs:
   build-libbox:
@@ -18,13 +13,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: SagerNet/sing-box
-          ref: ${{ github.event.inputs.version }}
+          ref: 'v1.13.8' # တကယ်ရှိတဲ့ နောက်ဆုံး Stable Version အစစ်ကို တိုက်ရိုက် ခေါ်ထားပါတယ်။
           fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod' # Sing-box ရဲ့ မူရင်း Go Version ကိုပဲ အတိအကျ ယူပါမယ်
+          go-version-file: 'go.mod'
           cache: true
 
       - name: Setup Java 17
@@ -37,7 +32,7 @@ jobs:
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
-          ndk-version: r25c # C++ Linker Error ကို ရှောင်ဖို့ r25c ပြောင်းထားပါတယ်
+          ndk-version: r25c # Linker Error မရှိတဲ့ Version
           add-to-path: true
 
       - name: Install gomobile
@@ -56,20 +51,18 @@ jobs:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
-          # Error တက်စေတဲ့ cronet ကို ဖယ်ထုတ်ပြီး gomobile ကို တိုက်ရိုက် သုံးထားပါတယ်
+          # Error တက်စေတဲ့ cronet ကို ဖယ်ထုတ်ပြီး Hysteria2, Reality အကုန်ပါတဲ့ Tags တွေနဲ့ Build ပါမယ်
           gomobile bind -v -target=android -androidapi 21 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
 
       - name: Move and rename output
         run: |
           mkdir -p output
-          VERSION=${{ github.event.inputs.version }}
-          if [ -z "$VERSION" ]; then VERSION="testing"; fi
-          mv libbox.aar output/libbox-${VERSION}.aar
-          echo "AAR_FILE=output/libbox-${VERSION}.aar" >> $GITHUB_ENV
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          mv libbox.aar output/libbox-v1.13.8.aar
+          echo "AAR_FILE=output/libbox-v1.13.8.aar" >> $GITHUB_ENV
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: libbox-${{ env.VERSION }}
+          name: libbox-v1.13.8
           path: ${{ env.AAR_FILE }}
+          retention-days: 30
