@@ -16,7 +16,8 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23' # အသစ်ဆုံး Go ကို သုံးပါမယ်
+          go-version: '1.23'
+          cache: false # Cache ကြောင့် Error မတက်အောင် ပိတ်ထားပါမယ်
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -26,14 +27,21 @@ jobs:
 
       - name: Build Engine
         run: |
-          # gomobile ကို သွင်းပြီး path သတ်မှတ်မယ်
+          # 1. gomobile နဲ့ လိုအပ်တဲ့ tools တွေ သွင်းမယ်
           go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          
+          # 2. Path တွေကို သတ်မှတ်မယ်
           export PATH=$PATH:$(go env GOPATH)/bin
+          
+          # 3. gomobile ကို init လုပ်မယ်
           gomobile init
           
-          # androidapi 21 ကနေ 26 ကို တိုးလိုက်ပါတယ် (Hysteria2 အတွက် ပိုတည်ငြိမ်အောင်)
-          # with_gvisor ကို ပြန်ထည့်ပေးထားပါတယ်
-          gomobile bind -v -target=android -androidapi 26 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
+          # 4. လိုအပ်တဲ့ mobile bind package ကို တိုက်ရိုက်ယူမယ်
+          go get golang.org/x/mobile/bind
+          
+          # 5. Build စလုပ်မယ် (Tags တွေကို အစ်ကို့အတွက် အစုံထည့်ပေးထားပါတယ်)
+          gomobile bind -v -target=android -androidapi 21 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
