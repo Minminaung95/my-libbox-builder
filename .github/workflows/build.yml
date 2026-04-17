@@ -22,10 +22,13 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/SagerNet/sing-box.git
           cd sing-box
+          export PATH=$PATH:$(go env GOPATH)/bin
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          gomobile init
           go run ./cmd/internal/build_libbox -target android
 
       - name: Upload AAR File
         uses: actions/upload-artifact@v4
         with:
           name: libbox-aar
-          path: sing-box/*.aar
+          path: sing-box/**/*.aar
