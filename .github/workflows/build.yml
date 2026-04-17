@@ -12,13 +12,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: SagerNet/sing-box
-          ref: 'v1.13.8' # <--- တကယ်ရှိတဲ့ Version အစစ်ကို ပြောင်းထားပါတယ်။
-          fetch-depth: 1
+          ref: 'v1.18.8' # Hysteria2 အပြည့်အဝပါတဲ့ ဗားရှင်းပါ
+          fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21.13' # os.checkPidfdOnce Error မတက်အောင်ပါ
+          go-version: '1.22'
+          cache: true
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -28,24 +29,29 @@ jobs:
 
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
+        id: setup-ndk
         with:
-          ndk-version: r25c # Linker Error မတက်အောင်ပါ
+          ndk-version: r25c # Cronet Error မတက်အောင်ပါ
+          add-to-path: true
 
       - name: Install gomobile
         run: |
-          go install golang.org/x/mobile/cmd/gomobile@latest
-          go install golang.org/x/mobile/cmd/gobind@latest
+          # ဒီနေရာက အရေးအကြီးဆုံးပါပဲ။ SagerNet ရဲ့ Tool ကိုသုံးမှ Error မတက်မှာပါ
+          go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
+          go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.12
           export PATH=$PATH:$(go env GOPATH)/bin
           gomobile init
-          go get golang.org/x/mobile/bind
 
       - name: Build libbox.aar
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
-          gomobile bind -v -target=android -androidapi 21 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
+          # SagerNet ရဲ့ မူရင်း Build Script ကို တိုက်ရိုက် သုံးလိုက်ပါပြီ
+          go run ./cmd/internal/build_libbox -target android
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: libbox-aar
-          path: libbox.aar # ဖိုင် အပြင်ထုတ်ပေးပါမယ်
+          path: '*.aar' # ထွက်လာတဲ့ aar ဖိုင်ကို အပြင်ထုတ်ပေးပါမယ်
