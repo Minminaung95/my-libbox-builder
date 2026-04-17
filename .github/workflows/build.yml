@@ -1,38 +1,62 @@
-name: "Build and push images"
+name: Build libbox AAR
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'sing-box branch or tag (e.g. v1.18.8)'
+        required: false
+        default: 'v1.18.8' # တည်ငြိမ်တဲ့ Version ကို Default ထားပေးထားပါတယ်
 
 jobs:
-  Build:
-      runs-on: ubuntu-latest
-      name: "Build Sing-box image"
-      env:
-        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-        DOCKERHUB_REPOSITORY: ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
+  build-libbox:
+    name: Build libbox.aar
+    runs-on: ubuntu-latest
 
-      steps:
-      - name: Checkout code
-        uses: actions/checkout@v6.0.2
+    steps:
+      - name: Checkout sing-box
+        uses: actions/checkout@v4
         with:
+          repository: SagerNet/sing-box
+          ref: ${{ github.event.inputs.version }}
           fetch-depth: 0
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4.0.0
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4.0.0
-
-      - name: Login to DockerHub
-        uses: docker/login-action@v4.0.0
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          username: ${{ env.DOCKER_USERNAME }}
-          password: ${{ env.DOCKER_PASSWORD }}
+          go-version: '1.21.13' # ပိုပြီး တည်ငြိမ်တဲ့ Go ကို သုံးပါမယ်
+          cache: true
 
-      - name: Push images to Docker hub
-        uses: docker/build-push-action@v7.0.0
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
         with:
-          push: true
-          platforms: linux/amd64, linux/arm64, linux/arm/v7
-          tags: ${{ env.DOCKERHUB_REPOSITORY }}
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r25c # Linker Error မရှိတဲ့ ဗားရှင်းကို ပြောင်းထားပါတယ်
+          add-to-path: true
+
+      - name: Install gomobile
+        run: |
+          go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
+          go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.12
+          export PATH=$PATH:$(go env GOPATH)/bin
+          gomobile init
+
+      - name: Build libbox.aar
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          # အခုနက Error တက်စေတဲ့ cronet ကို tags ထဲမှာ ဖယ်ထုတ်ပြီး Build ပါမယ်
+          # ဒါဟာ VPN App အတွက် ဘာမှ မထိခိုက်ပါဘူး
+          gomobile bind -v -target=android -androidapi 21 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libbox-aar
+          path: libbox.aar
