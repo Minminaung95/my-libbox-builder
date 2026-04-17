@@ -18,17 +18,26 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Setup Android NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK
+        run: sdkmanager "ndk;25.2.9519653"
+
       - name: Clone and Build Engine
         run: |
           git clone --depth 1 https://github.com/SagerNet/sing-box.git
           cd sing-box
           export PATH=$PATH:$(go env GOPATH)/bin
+          export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653
           go install golang.org/x/mobile/cmd/gomobile@latest
           gomobile init
           go run ./cmd/internal/build_libbox -target android
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-android.outputs.sdk-path }}/ndk/25.2.9519653
 
       - name: Upload AAR File
         uses: actions/upload-artifact@v4
         with:
           name: libbox-aar
-          path: sing-box/**/*.aar
+          path: sing-box/*.aar
