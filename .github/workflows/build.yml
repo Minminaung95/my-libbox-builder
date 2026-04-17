@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: SagerNet/sing-box
-          ref: 'v1.18.8' # Hysteria2 အပြည့်အဝပါတဲ့ ဗားရှင်းပါ
+          ref: 'v1.13.8' # <--- ဒီတစ်ခါ တကယ်ရှိတဲ့ Version အစစ်ကို သေချာထည့်ထားပါတယ်
           fetch-depth: 0
 
       - name: Setup Go
@@ -31,12 +31,11 @@ jobs:
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
-          ndk-version: r25c # Cronet Error မတက်အောင်ပါ
+          ndk-version: r25c
           add-to-path: true
 
-      - name: Install gomobile
+      - name: Install gomobile (SagerNet Tool)
         run: |
-          # ဒီနေရာက အရေးအကြီးဆုံးပါပဲ။ SagerNet ရဲ့ Tool ကိုသုံးမှ Error မတက်မှာပါ
           go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
           go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.12
           export PATH=$PATH:$(go env GOPATH)/bin
@@ -47,11 +46,10 @@ jobs:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
-          # SagerNet ရဲ့ မူရင်း Build Script ကို တိုက်ရိုက် သုံးလိုက်ပါပြီ
-          go run ./cmd/internal/build_libbox -target android
+          gomobile bind -v -target=android -androidapi 21 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: libbox-aar
-          path: '*.aar' # ထွက်လာတဲ့ aar ဖိုင်ကို အပြင်ထုတ်ပေးပါမယ်
+          name: libbox-v1.13.8-aar
+          path: libbox.aar
