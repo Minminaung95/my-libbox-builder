@@ -1,16 +1,10 @@
 name: Build libbox AAR
 
 on:
-  push:
-    branches: [ main, testing ]
-    tags:
-      - 'v*'
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
     inputs:
       version:
-        description: 'sing-box branch or tag (e.g. v1.18.8), empty = testing branch'
+        description: 'sing-box branch or tag (e.g. v1.18.8)'
         required: false
         default: 'v1.18.8'
 
@@ -24,13 +18,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: SagerNet/sing-box
-          ref: ${{ github.event.inputs.version || 'testing' }}
+          ref: ${{ github.event.inputs.version }}
           fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21.13'
+          go-version: '1.21.13' # ဒီဗားရှင်းက အခုနက Bug လုံးဝမရှိတဲ့ ဗားရှင်းပါ
           cache: true
 
       - name: Setup Java 17
@@ -43,7 +37,7 @@ jobs:
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
-          ndk-version: r25c # Linker Error ကင်းဝေးအောင် r25c ကို သုံးထားပါတယ်
+          ndk-version: r25c
           add-to-path: true
 
       - name: Install gomobile
@@ -53,31 +47,16 @@ jobs:
           export PATH=$PATH:$(go env GOPATH)/bin
           gomobile init
 
-      - name: Install dependencies
-        run: |
-          go mod download
-
       - name: Build libbox.aar
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
-          # Error တက်စေတဲ့ cronet ကို ဖယ်ထုတ်ပြီး အစ်ကို့အတွက် အသေချာဆုံး tags တွေနဲ့ build ပါမယ်
+          # with_cronet နဲ့ with_ech ကို ခဏဖြုတ်ပြီး build ပါမယ် (Linker Error ကျော်ဖို့ပါ)
           gomobile bind -v -target=android -androidapi 21 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
-
-      - name: Move and rename output
-        run: |
-          mkdir -p output
-          # Version နာမည်ယူတဲ့အပိုင်းမှာ အမှားမရှိအောင် သေချာပြင်ထားပါတယ်
-          VERSION=${{ github.event.inputs.version }}
-          if [ -z "$VERSION" ]; then VERSION="testing"; fi
-          mv libbox.aar output/libbox-${VERSION}.aar
-          echo "AAR_FILE=output/libbox-${VERSION}.aar" >> $GITHUB_ENV
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: libbox-${{ env.VERSION }}
-          path: ${{ env.AAR_FILE }}
-          retention-days: 30
+          name: libbox-aar
+          path: libbox.aar
