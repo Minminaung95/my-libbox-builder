@@ -7,6 +7,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Stable Source
+        uses: actions/checkout@v4
+        with:
+          repository: SagerNet/sing-box
+          ref: 'refs/tags/v1.18.8' # Tag ကို တိုက်ရိုက်ခေါ်တဲ့ နည်းလမ်းဖြစ်လို့ လုံးဝ မလွဲတော့ပါဘူး
+          fetch-depth: 1
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -18,25 +25,19 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Download and Build Engine
+      - name: Build Engine
         run: |
-          # Git ကို မသုံးတော့ဘဲ v1.18.8 source code ကို တိုက်ရိုက် Zip နဲ့ ဒေါင်းမယ်
-          curl -L https://github.com/SagerNet/sing-box/archive/refs/tags/v1.18.8.zip -o source.zip
-          unzip source.zip
-          cd sing-box-1.18.8
-          
           # gomobile သွင်းမယ်
           go install golang.org/x/mobile/cmd/gomobile@latest
           go install golang.org/x/mobile/cmd/gobind@latest
           export PATH=$PATH:$(go env GOPATH)/bin
           gomobile init
+          
+          # လိုအပ်တဲ့ Bind package ကို သေချာ ခေါ်မယ်
           go get golang.org/x/mobile/bind
           
-          # အင်ဂျင်ကို ထုတ်မယ်
+          # အင်ဂျင်ကို ထုတ်မယ် (with_gvisor ပါ ထည့်ပေးထားပါတယ်)
           gomobile bind -v -target=android -androidapi 21 -javapkg=io.nekohasekai -tags with_quic,with_grpc,with_wireguard,with_utls,with_reality,with_clash_api,with_gvisor -o libbox.aar ./experimental/libbox
-          
-          # ဖိုင်ကို အပြင်ဘက် ပြန်ထုတ်မယ်
-          cp libbox.aar ../
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
